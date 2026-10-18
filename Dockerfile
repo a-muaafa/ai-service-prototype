@@ -22,16 +22,7 @@ COPY main.py ./
 COPY model.joblib model_metadata.json ./
 
 # Fail fast with a clear message if the model is invalid
-RUN python -c "\
-import sys, joblib; \
-try: \
-    m = joblib.load('model.joblib'); \
-    assert hasattr(m, 'predict'), 'Model has no predict method'; \
-    print('Model verified successfully'); \
-except Exception as e: \
-    print(f'Model verification FAILED: {e}', file=sys.stderr); \
-    sys.exit(1) \
-"
+RUN python -c "import joblib; m = joblib.load('model.joblib'); assert hasattr(m, 'predict'), 'Model has no predict method'; print('Model verified successfully')"
 
 # Create non-root user
 RUN adduser --disabled-password --gecos "" appuser
