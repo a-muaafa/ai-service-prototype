@@ -1,7 +1,22 @@
+# Directories
 __pycache__/
-*.pyc
-.env
 .venv/
 venv/
-*.egg-info/
+.git/
+.github/
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# Files not needed in production image
+.env
+.env.example
+.gitignore
+.dockerignore
+test_main.py
+train_model.py
+evaluation_report.txt
+README.md
+pyproject.toml
+*.md
