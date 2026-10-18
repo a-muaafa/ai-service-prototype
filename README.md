@@ -1,6 +1,6 @@
 # AI Service Integration Prototype
 
-> **⚠️ Prototype Notice:** This project uses **synthetic training data** generated
+> **Prototype Notice:** This project uses **synthetic training data** generated
 > from a fixed formula. Predictions are for **demonstration purposes only** and do
 > not represent real property market values.
 

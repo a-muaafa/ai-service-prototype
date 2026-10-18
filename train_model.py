@@ -34,7 +34,6 @@ from sklearn.preprocessing import OrdinalEncoder, StandardScaler
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
 
-# ── Constants ────────────────────────────────────────────────────────
 RANDOM_STATE = 42
 N_SAMPLES = 5_000
 MODEL_VERSION = "2.0.0-gbr"
@@ -58,8 +57,6 @@ FEATURE_RANGES = {
 
 LOCATION_MAP = {"urban": 1.40, "suburban": 1.00, "rural": 0.65}
 
-
-# ── Data Generation ─────────────────────────────────────────────────
 
 def generate_synthetic_data(
     n_samples: int = N_SAMPLES,
@@ -107,8 +104,6 @@ def generate_synthetic_data(
     return X, price
 
 
-# ── Pipeline Construction ────────────────────────────────────────────
-
 def build_pipeline(random_state: int = RANDOM_STATE) -> Pipeline:
     """Build the full sklearn Pipeline (preprocessing + regressor)."""
     numeric_idx = [0, 1, 2, 3, 5]
@@ -136,8 +131,6 @@ def build_pipeline(random_state: int = RANDOM_STATE) -> Pipeline:
     ])
 
 
-# ── Training & Evaluation ───────────────────────────────────────────
-
 def train_and_evaluate() -> dict:
     """Train the model, evaluate against a baseline, and save artifacts.
 
@@ -154,23 +147,19 @@ def train_and_evaluate() -> dict:
     logger.info("Generating synthetic training data (%d samples)...", N_SAMPLES)
     X, y = generate_synthetic_data()
 
-    # ── Train / test split (fixed seed for reproducibility) ──────
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=RANDOM_STATE,
     )
     logger.info("Split: %d train / %d test", len(y_train), len(y_test))
 
-    # ── Train ────────────────────────────────────────────────────
     logger.info("Training pipeline...")
     pipeline = build_pipeline()
     pipeline.fit(X_train, y_train)
 
-    # ── Evaluate model ───────────────────────────────────────────
     y_pred = pipeline.predict(X_test)
     mae = mean_absolute_error(y_test, y_pred)
     r2 = r2_score(y_test, y_pred)
 
-    # ── Baseline: predict mean of training set ───────────────────
     baseline_pred = np.full_like(y_test, y_train.mean())
     baseline_mae = mean_absolute_error(y_test, baseline_pred)
     baseline_r2 = r2_score(y_test, baseline_pred)
@@ -184,12 +173,10 @@ def train_and_evaluate() -> dict:
     logger.info("  Baseline R²  : %.4f  (mean predictor)", baseline_r2)
     logger.info("  Improvement  : %.1f%% MAE reduction vs baseline", mae_improvement)
 
-    # ── Save model ───────────────────────────────────────────────
     MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(pipeline, MODEL_PATH)
     logger.info("Model saved → %s", MODEL_PATH)
 
-    # ── Save metadata ────────────────────────────────────────────
     metadata = {
         "model_version": MODEL_VERSION,
         "trained_at": datetime.now(timezone.utc).isoformat(),
@@ -219,7 +206,6 @@ def train_and_evaluate() -> dict:
         json.dump(metadata, f, indent=2, ensure_ascii=False)
     logger.info("Metadata saved → %s", METADATA_PATH)
 
-    # ── Save evaluation report ───────────────────────────────────
     report_lines = [
         "=" * 60,
         "MODEL EVALUATION REPORT",
@@ -254,7 +240,6 @@ def train_and_evaluate() -> dict:
         f.write("\n".join(report_lines) + "\n")
     logger.info("Evaluation report saved → %s", EVAL_REPORT_PATH)
 
-    # ── Verify model can be reloaded ─────────────────────────────
     logger.info("Verifying model reload + prediction consistency...")
     reloaded = joblib.load(MODEL_PATH)
     sample_input = X_test[:1]
@@ -265,17 +250,15 @@ def train_and_evaluate() -> dict:
             f"Reload verification FAILED: original={original_pred}, "
             f"reloaded={reloaded_pred}"
         )
-    logger.info("Reload verification PASSED ✓")
+    logger.info("Reload verification PASSED")
 
     return metadata
 
 
-# ── Entry Point ──────────────────────────────────────────────────────
-
 if __name__ == "__main__":
     try:
         result = train_and_evaluate()
-        print(f"\n✓ Training complete. Model ready at: {MODEL_PATH}")
+        print(f"\nTraining complete. Model ready at: {MODEL_PATH}")
         print(f"  MAE : ${result['metrics']['mae']:,.2f}")
         print(f"  R²  : {result['metrics']['r2']:.4f}")
         sys.exit(0)

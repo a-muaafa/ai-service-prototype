@@ -34,14 +34,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-# ── Logging ──────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
 )
 logger = logging.getLogger("ai_service")
 
-# ── Configuration (from environment variables) ───────────────────────
 API_KEY: str | None = os.environ.get("API_KEY") or None
 RATE_LIMIT_MAX: int = int(os.environ.get("RATE_LIMIT_MAX", "120"))
 RATE_LIMIT_WINDOW: int = int(os.environ.get("RATE_LIMIT_WINDOW", "60"))
@@ -52,15 +50,10 @@ CORS_ORIGINS: list[str] = [
 ]
 MAX_REQUEST_SIZE: int = int(os.environ.get("MAX_REQUEST_SIZE", str(1024 * 16)))
 
-# ── Paths (relative to this file, not CWD) ──────────────────────────
 _PROJECT_DIR = Path(__file__).resolve().parent
 MODEL_PATH = _PROJECT_DIR / "model.joblib"
 METADATA_PATH = _PROJECT_DIR / "model_metadata.json"
 
-
-# ╔══════════════════════════════════════════════════════════════════╗
-# ║  Pydantic Schemas                                               ║
-# ╚══════════════════════════════════════════════════════════════════╝
 
 class PredictionRequest(BaseModel):
     """Input schema for property value estimation.
@@ -105,8 +98,6 @@ class PredictionRequest(BaseModel):
         description="Whether the property has a garage.",
         examples=[True],
     )
-
-    # -- Validators -------------------------------------------------------
 
     @field_validator("square_footage", "num_bathrooms", mode="before")
     @classmethod
@@ -170,10 +161,6 @@ class ErrorResponse(BaseModel):
     request_id: str | None = None
 
 
-# ╔══════════════════════════════════════════════════════════════════╗
-# ║  Rate Limiter (in-memory, sliding window)                       ║
-# ╚══════════════════════════════════════════════════════════════════╝
-
 class RateLimiter:
     """Simple per-key sliding-window rate limiter."""
 
@@ -194,10 +181,6 @@ class RateLimiter:
         q.append(now)
         return True
 
-
-# ╔══════════════════════════════════════════════════════════════════╗
-# ║  Model Wrapper                                                  ║
-# ╚══════════════════════════════════════════════════════════════════╝
 
 class PropertyPredictor:
     """Wraps the trained sklearn Pipeline with metadata & safety checks.
@@ -261,8 +244,6 @@ class PropertyPredictor:
             self._model_version, model_path.name,
         )
 
-    # -- Properties -------------------------------------------------------
-
     @property
     def version(self) -> str:
         return self._model_version
@@ -270,8 +251,6 @@ class PropertyPredictor:
     @property
     def metadata(self) -> dict:
         return self._metadata
-
-    # -- Prediction -------------------------------------------------------
 
     def _check_extrapolation(self, req: PredictionRequest) -> bool:
         """Return True if any input is outside the training-data range."""
@@ -314,10 +293,6 @@ class PropertyPredictor:
         }
 
 
-# ╔══════════════════════════════════════════════════════════════════╗
-# ║  Application State & Lifespan                                   ║
-# ╚══════════════════════════════════════════════════════════════════╝
-
 _predictor: PropertyPredictor | None = None
 _start_time: float = 0.0
 _rate_limiter: RateLimiter | None = None
@@ -352,15 +327,11 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down AI Service.")
 
 
-# ╔══════════════════════════════════════════════════════════════════╗
-# ║  FastAPI App                                                     ║
-# ╚══════════════════════════════════════════════════════════════════╝
-
 app = FastAPI(
     title="AI Service Integration Prototype",
     description=(
         "REST API for property value estimation using a trained ML model.\n\n"
-        "**⚠️ Prototype notice:** This service uses *synthetic* training data. "
+        "**Prototype Notice:** This service uses *synthetic* training data. "
         "Predictions are for demonstration purposes only and do not represent "
         "real property market values."
     ),
@@ -370,8 +341,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-
-# ── CORS (only when origins are explicitly configured) ───────────────
 if CORS_ORIGINS:
     app.add_middleware(
         CORSMiddleware,
@@ -381,15 +350,12 @@ if CORS_ORIGINS:
     )
 
 
-# ── Middleware ───────────────────────────────────────────────────────
-
 @app.middleware("http")
 async def request_middleware(request: Request, call_next) -> Response:
     """Inject request-ID, enforce rate limits & request size."""
     request_id = str(uuid.uuid4())
     request.state.request_id = request_id
 
-    # ── Rate limiting ────────────────────────────────────────────
     if _rate_limiter is not None:
         client_ip = request.client.host if request.client else "unknown"
         if not _rate_limiter.is_allowed(client_ip):
@@ -403,7 +369,6 @@ async def request_middleware(request: Request, call_next) -> Response:
                 },
             )
 
-    # ── Request body size ────────────────────────────────────────
     content_length = request.headers.get("content-length")
     if content_length and int(content_length) > MAX_REQUEST_SIZE:
         return JSONResponse(
@@ -415,7 +380,6 @@ async def request_middleware(request: Request, call_next) -> Response:
             },
         )
 
-    # ── API-key authentication (if configured) ───────────────────
     # Health endpoints are always accessible (for load-balancer probes).
     if API_KEY is not None and request.url.path not in (
         "/", "/api/v1/health", "/api/v1/ready", "/docs", "/redoc", "/openapi.json",
@@ -444,8 +408,6 @@ async def request_middleware(request: Request, call_next) -> Response:
     )
     return response
 
-
-# ── Exception Handlers ───────────────────────────────────────────────
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(
@@ -499,8 +461,6 @@ async def unhandled_exception_handler(
     )
 
 
-# ── Dependencies ─────────────────────────────────────────────────────
-
 def get_predictor() -> PropertyPredictor:
     """Dependency: returns the loaded predictor or raises 503."""
     if _predictor is None:
@@ -513,10 +473,6 @@ def get_predictor() -> PropertyPredictor:
 
 PredictorDep = Annotated[PropertyPredictor, Depends(get_predictor)]
 
-
-# ╔══════════════════════════════════════════════════════════════════╗
-# ║  Routes                                                         ║
-# ╚══════════════════════════════════════════════════════════════════╝
 
 @app.get("/", tags=["Health"], summary="Root / liveness probe")
 async def root() -> HealthResponse:
@@ -619,7 +575,6 @@ async def predict(
     )
 
 
-# ── Local dev entry-point ────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
 

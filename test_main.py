@@ -19,14 +19,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-# ── Project paths ────────────────────────────────────────────────────
 PROJECT_DIR = Path(__file__).resolve().parent
 MODEL_FILE = PROJECT_DIR / "model.joblib"
 
-
-# ╔══════════════════════════════════════════════════════════════════╗
-# ║  Fixtures                                                       ║
-# ╚══════════════════════════════════════════════════════════════════╝
 
 @pytest.fixture(scope="module")
 def client():
@@ -48,8 +43,6 @@ def no_model_client(client):
     main._predictor = backup
 
 
-# ── Payloads ─────────────────────────────────────────────────────────
-
 VALID_PAYLOAD = {
     "square_footage": 1500.0,
     "num_bedrooms": 3,
@@ -59,10 +52,6 @@ VALID_PAYLOAD = {
     "has_garage": True,
 }
 
-
-# ╔══════════════════════════════════════════════════════════════════╗
-# ║  Health & Readiness                                             ║
-# ╚══════════════════════════════════════════════════════════════════╝
 
 class TestHealthEndpoints:
     """Process-level health and model-readiness probes."""
@@ -90,10 +79,6 @@ class TestHealthEndpoints:
         assert body["model_version"] != ""
         assert "sklearn_version" in body
 
-
-# ╔══════════════════════════════════════════════════════════════════╗
-# ║  Prediction – Valid Inputs                                      ║
-# ╚══════════════════════════════════════════════════════════════════╝
 
 class TestPrediction:
     """Successful prediction and response structure."""
@@ -143,14 +128,8 @@ class TestPrediction:
         assert resp.json()["extrapolation_warning"] is True
 
 
-# ╔══════════════════════════════════════════════════════════════════╗
-# ║  Input Validation                                               ║
-# ╚══════════════════════════════════════════════════════════════════╝
-
 class TestInputValidation:
     """Boundary checks, type errors, and forbidden values."""
-
-    # -- Square footage ---------------------------------------------------
 
     def test_negative_square_footage_rejected(self, client):
         resp = client.post("/api/v1/predict", json={**VALID_PAYLOAD, "square_footage": -100.0})
@@ -169,8 +148,6 @@ class TestInputValidation:
         resp = client.post("/api/v1/predict", json={**VALID_PAYLOAD, "square_footage": 25_000.0})
         assert resp.status_code == 422
 
-    # -- Bedrooms ---------------------------------------------------------
-
     def test_zero_bedrooms_rejected(self, client):
         resp = client.post("/api/v1/predict", json={**VALID_PAYLOAD, "num_bedrooms": 0})
         assert resp.status_code == 422
@@ -179,26 +156,18 @@ class TestInputValidation:
         resp = client.post("/api/v1/predict", json={**VALID_PAYLOAD, "num_bedrooms": 25})
         assert resp.status_code == 422
 
-    # -- Bathrooms --------------------------------------------------------
-
     def test_invalid_bathroom_step_rejected(self, client):
         resp = client.post("/api/v1/predict", json={**VALID_PAYLOAD, "num_bathrooms": 1.3})
         assert resp.status_code == 422
-
-    # -- Age --------------------------------------------------------------
 
     def test_negative_age_rejected(self, client):
         resp = client.post("/api/v1/predict", json={**VALID_PAYLOAD, "age_years": -5})
         assert resp.status_code == 422
 
-    # -- Location ---------------------------------------------------------
-
     def test_invalid_location_tier_rejected(self, client):
         resp = client.post("/api/v1/predict", json={**VALID_PAYLOAD, "location_tier": "downtown"})
         assert resp.status_code == 422
         assert resp.json()["status"] == "error"
-
-    # -- NaN / Infinity ---------------------------------------------------
 
     def test_nan_in_json_rejected(self, client):
         """NaN is not valid JSON; the server must reject it."""
@@ -227,8 +196,6 @@ class TestInputValidation:
         )
         assert resp.status_code == 422
 
-    # -- Missing / Extra fields -------------------------------------------
-
     def test_missing_required_field_rejected(self, client):
         payload = {k: v for k, v in VALID_PAYLOAD.items() if k != "square_footage"}
         resp = client.post("/api/v1/predict", json=payload)
@@ -239,10 +206,6 @@ class TestInputValidation:
         resp = client.post("/api/v1/predict", json=payload)
         assert resp.status_code == 422
 
-
-# ╔══════════════════════════════════════════════════════════════════╗
-# ║  Error Response Structure                                       ║
-# ╚══════════════════════════════════════════════════════════════════╝
 
 class TestErrorStructure:
     """All error responses must have consistent shape and hide internals."""
@@ -265,10 +228,6 @@ class TestErrorStructure:
         body = resp.json()
         assert "request_id" in body
 
-
-# ╔══════════════════════════════════════════════════════════════════╗
-# ║  Model Absence / Degraded Mode                                 ║
-# ╚══════════════════════════════════════════════════════════════════╝
 
 class TestModelAbsence:
     """When the model is not loaded the service must degrade gracefully."""
@@ -293,10 +252,6 @@ class TestModelAbsence:
         resp = no_model_client.get("/")
         assert resp.status_code == 200
 
-
-# ╔══════════════════════════════════════════════════════════════════╗
-# ║  Model Artifact Integrity                                       ║
-# ╚══════════════════════════════════════════════════════════════════╝
 
 class TestModelArtifact:
     """Verify the trained model file is loadable."""

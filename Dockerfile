@@ -1,4 +1,4 @@
-# ── Stage 1: Install dependencies ────────────────────────────────
+# Stage 1: Build dependencies
 FROM python:3.11-slim AS builder
 
 WORKDIR /build
@@ -7,7 +7,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 
-# ── Stage 2: Runtime ─────────────────────────────────────────────
+# Stage 2: Runtime
 FROM python:3.11-slim AS runtime
 
 WORKDIR /app
@@ -27,9 +27,9 @@ import sys, joblib; \
 try: \
     m = joblib.load('model.joblib'); \
     assert hasattr(m, 'predict'), 'Model has no predict method'; \
-    print('✓ Model verified successfully'); \
+    print('Model verified successfully'); \
 except Exception as e: \
-    print(f'✗ Model verification FAILED: {e}', file=sys.stderr); \
+    print(f'Model verification FAILED: {e}', file=sys.stderr); \
     sys.exit(1) \
 "
 

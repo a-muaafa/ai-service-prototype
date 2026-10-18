@@ -27,9 +27,9 @@ jobs:
 
       - name: Verify model artifacts
         run: |
-          test -f model.joblib && echo "✓ model.joblib exists"
-          test -f model_metadata.json && echo "✓ model_metadata.json exists"
-          test -f evaluation_report.txt && echo "✓ evaluation_report.txt exists"
+          test -f model.joblib && echo "model.joblib exists"
+          test -f model_metadata.json && echo "model_metadata.json exists"
+          test -f evaluation_report.txt && echo "evaluation_report.txt exists"
 
       - name: Run tests
         run: pytest -v --tb=short
@@ -60,12 +60,12 @@ jobs:
       - name: Health check
         run: |
           curl -sf http://localhost:8000/api/v1/health | python -m json.tool
-          echo "✓ Health check passed"
+          echo "Health check passed"
 
       - name: Readiness check
         run: |
           curl -sf http://localhost:8000/api/v1/ready | python -m json.tool
-          echo "✓ Readiness check passed"
+          echo "Readiness check passed"
 
       - name: Prediction test
         run: |
@@ -79,7 +79,7 @@ jobs:
               "location_tier": "suburban",
               "has_garage": true
             }' | python -m json.tool
-          echo "✓ Prediction test passed"
+          echo "Prediction test passed"
 
       - name: Stop container
         if: always()
