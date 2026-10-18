@@ -12,6 +12,7 @@ Covers:
 - Model version consistency
 - API-key authentication (when configured)
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -29,6 +30,7 @@ def client():
     if not MODEL_FILE.exists():
         pytest.skip("model.joblib not found; run 'python train_model.py' first.")
     from main import app
+
     with TestClient(app, raise_server_exceptions=False) as c:
         yield c
 
@@ -37,6 +39,7 @@ def client():
 def no_model_client(client):
     """Same client but with the predictor temporarily removed."""
     import main
+
     backup = main._predictor
     main._predictor = None
     yield client
@@ -265,6 +268,7 @@ class TestModelArtifact:
         if not MODEL_FILE.exists():
             pytest.skip("model.joblib not found")
         import joblib
+
         pipeline = joblib.load(MODEL_FILE)
         assert hasattr(pipeline, "predict")
 
@@ -273,6 +277,7 @@ class TestModelArtifact:
         if not meta.exists():
             pytest.skip("model_metadata.json not found")
         import json
+
         with open(meta) as f:
             data = json.load(f)
         assert "model_version" in data
@@ -285,6 +290,7 @@ class TestModelArtifact:
             pytest.skip("model.joblib not found")
         import joblib
         import numpy as np
+
         pipeline = joblib.load(MODEL_FILE)
         sample = np.array([[1500, 3, 2.0, 10, "suburban", 1]], dtype=object)
         pred = float(pipeline.predict(sample)[0])

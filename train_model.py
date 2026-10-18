@@ -13,12 +13,13 @@ Pricing formula:
           + garage * 15_000
           + noise(mean=0, std=8_000)
 """
+
 from __future__ import annotations
 
 import json
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import joblib
@@ -93,14 +94,16 @@ def generate_synthetic_data(
         + rng.normal(0, 8_000, n_samples)
     )
 
-    X = np.column_stack([
-        square_footage,
-        num_bedrooms,
-        num_bathrooms,
-        age_years,
-        location_tier,
-        has_garage,
-    ])
+    X = np.column_stack(  # noqa: N806
+        [
+            square_footage,
+            num_bedrooms,
+            num_bathrooms,
+            age_years,
+            location_tier,
+            has_garage,
+        ]
+    )
     return X, price
 
 
@@ -120,15 +123,20 @@ def build_pipeline(random_state: int = RANDOM_STATE) -> Pipeline:
         ]
     )
 
-    return Pipeline([
-        ("preprocessor", preprocessor),
-        ("regressor", GradientBoostingRegressor(
-            n_estimators=200,
-            max_depth=4,
-            learning_rate=0.1,
-            random_state=random_state,
-        )),
-    ])
+    return Pipeline(
+        [
+            ("preprocessor", preprocessor),
+            (
+                "regressor",
+                GradientBoostingRegressor(
+                    n_estimators=200,
+                    max_depth=4,
+                    learning_rate=0.1,
+                    random_state=random_state,
+                ),
+            ),
+        ]
+    )
 
 
 def train_and_evaluate() -> dict:
@@ -145,10 +153,13 @@ def train_and_evaluate() -> dict:
         Model metadata dictionary.
     """
     logger.info("Generating synthetic training data (%d samples)...", N_SAMPLES)
-    X, y = generate_synthetic_data()
+    X, y = generate_synthetic_data()  # noqa: N806
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=RANDOM_STATE,
+    X_train, X_test, y_train, y_test = train_test_split(  # noqa: N806
+        X,
+        y,
+        test_size=0.2,
+        random_state=RANDOM_STATE,
     )
     logger.info("Split: %d train / %d test", len(y_train), len(y_test))
 
@@ -179,7 +190,7 @@ def train_and_evaluate() -> dict:
 
     metadata = {
         "model_version": MODEL_VERSION,
-        "trained_at": datetime.now(timezone.utc).isoformat(),
+        "trained_at": datetime.now(UTC).isoformat(),
         "sklearn_version": sklearn.__version__,
         "joblib_version": joblib.__version__,
         "python_version": sys.version.split()[0],
@@ -213,7 +224,7 @@ def train_and_evaluate() -> dict:
         f"Model Version    : {MODEL_VERSION}",
         f"Training Date    : {metadata['trained_at']}",
         f"scikit-learn     : {sklearn.__version__}",
-        f"Data Source       : SYNTHETIC (not real property data)",
+        "Data Source       : SYNTHETIC (not real property data)",
         f"Total Samples     : {N_SAMPLES}",
         f"Train / Test      : {len(y_train)} / {len(y_test)}",
         f"Random State      : {RANDOM_STATE}",
@@ -221,6 +232,10 @@ def train_and_evaluate() -> dict:
         "── Model Performance ──",
         f"  MAE  : ${mae:,.2f}",
         f"  R²   : {r2:.4f}",
+        "",
+        "── Baseline (Mean Predictor) ──",
+        f"  MAE  : ${baseline_mae:,.2f}",
+        f"  R²   : {baseline_r2:.4f}",
         "",
         "── Baseline (Mean Predictor) ──",
         f"  MAE  : ${baseline_mae:,.2f}",
@@ -247,8 +262,7 @@ def train_and_evaluate() -> dict:
     reloaded_pred = float(reloaded.predict(sample_input)[0])
     if not np.isclose(original_pred, reloaded_pred):
         raise RuntimeError(
-            f"Reload verification FAILED: original={original_pred}, "
-            f"reloaded={reloaded_pred}"
+            f"Reload verification FAILED: original={original_pred}, reloaded={reloaded_pred}"
         )
     logger.info("Reload verification PASSED")
 

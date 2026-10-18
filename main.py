@@ -12,6 +12,7 @@ GET  /api/v1/health    — Process health (always OK while alive).
 GET  /api/v1/ready     — Readiness probe (model loaded & usable).
 POST /api/v1/predict   — Property value estimation.
 """
+
 from __future__ import annotations
 
 import collections
@@ -32,7 +33,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 
 logging.basicConfig(
     level=logging.INFO,
@@ -44,9 +45,7 @@ API_KEY: str | None = os.environ.get("API_KEY") or None
 RATE_LIMIT_MAX: int = int(os.environ.get("RATE_LIMIT_MAX", "120"))
 RATE_LIMIT_WINDOW: int = int(os.environ.get("RATE_LIMIT_WINDOW", "60"))
 CORS_ORIGINS: list[str] = [
-    o.strip()
-    for o in os.environ.get("CORS_ORIGINS", "").split(",")
-    if o.strip()
+    o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()
 ]
 MAX_REQUEST_SIZE: int = int(os.environ.get("MAX_REQUEST_SIZE", str(1024 * 16)))
 
@@ -69,22 +68,30 @@ class PredictionRequest(BaseModel):
     """
 
     square_footage: float = Field(
-        ..., gt=200, le=20_000,
+        ...,
+        gt=200,
+        le=20_000,
         description="Livable area in square feet (200 < value ≤ 20,000).",
         examples=[1500.0],
     )
     num_bedrooms: int = Field(
-        ..., ge=1, le=20,
+        ...,
+        ge=1,
+        le=20,
         description="Number of bedrooms (1–20).",
         examples=[3],
     )
     num_bathrooms: float = Field(
-        ..., ge=1.0, le=10.0,
+        ...,
+        ge=1.0,
+        le=10.0,
         description="Number of bathrooms in 0.5 increments (1.0–10.0).",
         examples=[2.0],
     )
     age_years: int = Field(
-        ..., ge=0, le=200,
+        ...,
+        ge=0,
+        le=200,
         description="Age of the property in years (0–200).",
         examples=[10],
     )
@@ -122,13 +129,16 @@ class PredictionResponse(BaseModel):
 
     status: str = "success"
     predicted_value_usd: float = Field(
-        ..., description="Estimated property value in US dollars.",
+        ...,
+        description="Estimated property value in US dollars.",
     )
     currency: str = Field(
-        default="USD", description="Currency of the predicted value.",
+        default="USD",
+        description="Currency of the predicted value.",
     )
     model_version: str = Field(
-        ..., description="Version identifier of the model used.",
+        ...,
+        description="Version identifier of the model used.",
     )
     extrapolation_warning: bool = Field(
         default=False,
@@ -138,7 +148,8 @@ class PredictionResponse(BaseModel):
         ),
     )
     input_summary: dict = Field(
-        ..., description="Echo of the validated input features.",
+        ...,
+        description="Echo of the validated input features.",
     )
 
 
@@ -202,8 +213,7 @@ class PropertyPredictor:
     def __init__(self, model_path: Path = MODEL_PATH) -> None:
         if not model_path.exists():
             raise FileNotFoundError(
-                f"Model file not found at '{model_path}'. "
-                "Run 'python train_model.py' first."
+                f"Model file not found at '{model_path}'. Run 'python train_model.py' first."
             )
 
         self._pipeline = joblib.load(model_path)
@@ -216,7 +226,7 @@ class PropertyPredictor:
         metadata_path = model_path.parent / "model_metadata.json"
         if metadata_path.exists():
             try:
-                with open(metadata_path, "r", encoding="utf-8") as f:
+                with open(metadata_path, encoding="utf-8") as f:
                     self._metadata = json.load(f)
                 self._model_version = self._metadata.get("model_version", "unknown")
 
@@ -232,7 +242,8 @@ class PropertyPredictor:
                     logger.warning(
                         "Model trained with sklearn %s; runtime has %s. "
                         "This may cause compatibility issues.",
-                        saved_sklearn, sklearn.__version__,
+                        saved_sklearn,
+                        sklearn.__version__,
                     )
             except Exception:
                 logger.warning("Could not parse model metadata at %s", metadata_path)
@@ -241,7 +252,8 @@ class PropertyPredictor:
 
         logger.info(
             "Model loaded: version=%s, file=%s",
-            self._model_version, model_path.name,
+            self._model_version,
+            model_path.name,
         )
 
     @property
@@ -271,14 +283,19 @@ class PropertyPredictor:
     def _encode_features(self, req: PredictionRequest) -> np.ndarray:
         """Encode a PredictionRequest into the feature array expected
         by the pipeline (must match training column order)."""
-        return np.array([[
-            req.square_footage,
-            req.num_bedrooms,
-            req.num_bathrooms,
-            req.age_years,
-            req.location_tier,
-            int(req.has_garage),
-        ]], dtype=object)
+        return np.array(
+            [
+                [
+                    req.square_footage,
+                    req.num_bedrooms,
+                    req.num_bathrooms,
+                    req.age_years,
+                    req.location_tier,
+                    int(req.has_garage),
+                ]
+            ],
+            dtype=object,
+        )
 
     def predict(self, req: PredictionRequest) -> dict:
         features = self._encode_features(req)
@@ -382,7 +399,12 @@ async def request_middleware(request: Request, call_next) -> Response:
 
     # Health endpoints are always accessible (for load-balancer probes).
     if API_KEY is not None and request.url.path not in (
-        "/", "/api/v1/health", "/api/v1/ready", "/docs", "/redoc", "/openapi.json",
+        "/",
+        "/api/v1/health",
+        "/api/v1/ready",
+        "/docs",
+        "/redoc",
+        "/openapi.json",
     ):
         provided_key = request.headers.get("X-API-Key")
         if provided_key != API_KEY:
@@ -403,19 +425,22 @@ async def request_middleware(request: Request, call_next) -> Response:
     response.headers["X-Response-Time"] = f"{elapsed:.3f}s"
     logger.info(
         "%s %s → %d (%.3fs) [%s]",
-        request.method, request.url.path,
-        response.status_code, elapsed, request_id[:8],
+        request.method,
+        request.url.path,
+        response.status_code,
+        elapsed,
+        request_id[:8],
     )
     return response
 
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(
-    request: Request, exc: RequestValidationError,
+    request: Request,
+    exc: RequestValidationError,
 ) -> JSONResponse:
     messages = [
-        f"[{' -> '.join(str(p) for p in e.get('loc', []))}] "
-        f"{e.get('msg', 'invalid value')}"
+        f"[{' -> '.join(str(p) for p in e.get('loc', []))}] {e.get('msg', 'invalid value')}"
         for e in exc.errors()
     ]
     detail = "; ".join(messages)
@@ -429,12 +454,15 @@ async def validation_exception_handler(
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(
-    request: Request, exc: HTTPException,
+    request: Request,
+    exc: HTTPException,
 ) -> JSONResponse:
     request_id = getattr(request.state, "request_id", None)
     logger.error(
         "HTTP %s [%s]: %s",
-        exc.status_code, request_id and request_id[:8], exc.detail,
+        exc.status_code,
+        request_id and request_id[:8],
+        exc.detail,
     )
     return JSONResponse(
         status_code=exc.status_code,
@@ -444,12 +472,15 @@ async def http_exception_handler(
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(
-    request: Request, exc: Exception,
+    request: Request,
+    exc: Exception,
 ) -> JSONResponse:
     """Catch-all — never leak stack-traces or internal paths to clients."""
     request_id = getattr(request.state, "request_id", None)
     logger.exception(
-        "Unhandled error [%s]: %s", request_id and request_id[:8], type(exc).__name__,
+        "Unhandled error [%s]: %s",
+        request_id and request_id[:8],
+        type(exc).__name__,
     )
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -563,7 +594,7 @@ async def predict(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal prediction error.",
-        )
+        ) from None
 
     return PredictionResponse(
         status="success",
